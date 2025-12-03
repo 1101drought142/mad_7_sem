@@ -7,6 +7,10 @@ if (exists(".Random.seed")) rm(.Random.seed)
 if(!require(readxl)) install.packages("readxl", repos = "https://cran.r-project.org")
 library(readxl)
 
+# Устанавливаем пакет ggplot2 для визуализации если нужно
+if(!require(ggplot2)) install.packages("ggplot2", repos = "https://cran.r-project.org")
+library(ggplot2)
+
 # Загружаем данные из Excel файла с правильными типами колонок
 # Порядок: Номер (skip), Дата сделка (skip), Возраст, Дистанция до метро, Количество магазинов рядом, Широта, Долгота, Стоимость за ед площади
 file_path <- "houses/data.xlsx"
@@ -106,6 +110,46 @@ boxplot(price_per_unit ~ metro_group, data = df,
         main = "Стоимость за м2 по группам расстояния до метро",
         xlab = "Группа расстояния до метро", ylab = "Стоимость за м2")
 
+# === 6.1. Многослойная гистограмма для сравнения распределений по группам ===
+# Создаем папку для графиков если её нет
+if (!dir.exists("img")) dir.create("img")
+
+# Многослойная гистограмма с прозрачностью
+histogram_plot <- ggplot(df, aes(x = price_per_unit, fill = metro_group)) +
+  geom_histogram(alpha = 0.6, position = "identity", bins = 30, color = "black", size = 0.3) +
+  scale_fill_manual(values = c("Близко" = "#87CEEB", "Средне" = "#90EE90", "Далеко" = "#FFB6C1"),
+                    name = "Группа расстояния\nдо метро") +
+  labs(title = "Многослойная гистограмма: Стоимость за м2 по группам расстояния до метро",
+       x = "Стоимость за м2",
+       y = "Частота") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+        legend.position = "right")
+
+# Сохраняем график
+ggsave("img/histogram_density_by_groups.png", plot = histogram_plot, 
+       width = 10, height = 6, dpi = 300)
+cat("\nГрафик многослойной гистограммы сохранен: img/histogram_density_by_groups.png\n")
+
+# === 6.2. График плотности для сравнения формы распределений ===
+density_plot <- ggplot(df, aes(x = price_per_unit, fill = metro_group, color = metro_group)) +
+  geom_density(alpha = 0.5, size = 1) +
+  scale_fill_manual(values = c("Близко" = "#87CEEB", "Средне" = "#90EE90", "Далеко" = "#FFB6C1"),
+                    name = "Группа расстояния\nдо метро") +
+  scale_color_manual(values = c("Близко" = "#4682B4", "Средне" = "#32CD32", "Далеко" = "#FF69B4"),
+                     name = "Группа расстояния\nдо метро") +
+  labs(title = "График плотности: Сравнение распределений стоимости за м2 по группам",
+       x = "Стоимость за м2",
+       y = "Плотность") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+        legend.position = "right")
+
+# Сохраняем график
+ggsave("img/density_plot_by_groups.png", plot = density_plot, 
+       width = 10, height = 6, dpi = 300)
+cat("График плотности сохранен: img/density_plot_by_groups.png\n")
+
 # === 7. Формирование второго фактора (количество магазинов рядом в группы) ===
 # Разбиваем на три равные группы по квантилям
 df$stores_group <- cut(df$number_of_stores,
@@ -124,3 +168,46 @@ summary(anova_model2)
 # === 9. Интерпретация гипотезы ===
 # H0: стоимость за м2 не зависит от metro_group, stores_group и их взаимодействия
 # H1: хотя бы один фактор (или их взаимодействие) влияет на стоимость за м2
+
+# === 9.1. Визуализация для двухфакторного ANOVA ===
+# Многослойная гистограмма с двумя факторами
+histogram_2factor <- ggplot(df, aes(x = price_per_unit, fill = metro_group)) +
+  geom_histogram(alpha = 0.6, position = "identity", bins = 25, color = "black", size = 0.3) +
+  facet_wrap(~ stores_group, ncol = 3, labeller = labeller(stores_group = c("Мало" = "Мало магазинов", 
+                                                                             "Средне" = "Средне магазинов", 
+                                                                             "Много" = "Много магазинов"))) +
+  scale_fill_manual(values = c("Близко" = "#87CEEB", "Средне" = "#90EE90", "Далеко" = "#FFB6C1"),
+                    name = "Группа расстояния\nдо метро") +
+  labs(title = "Многослойная гистограмма: Стоимость за м2 по группам (двухфакторный анализ)",
+       x = "Стоимость за м2",
+       y = "Частота") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+        legend.position = "right",
+        strip.text = element_text(size = 10, face = "bold"))
+
+ggsave("img/histogram_2factor_anova.png", plot = histogram_2factor, 
+       width = 12, height = 6, dpi = 300)
+cat("\nГрафик многослойной гистограммы для двухфакторного ANOVA сохранен: img/histogram_2factor_anova.png\n")
+
+# График плотности с двумя факторами
+density_2factor <- ggplot(df, aes(x = price_per_unit, fill = metro_group, color = metro_group)) +
+  geom_density(alpha = 0.5, size = 1) +
+  facet_wrap(~ stores_group, ncol = 3, labeller = labeller(stores_group = c("Мало" = "Мало магазинов", 
+                                                                             "Средне" = "Средне магазинов", 
+                                                                             "Много" = "Много магазинов"))) +
+  scale_fill_manual(values = c("Близко" = "#87CEEB", "Средне" = "#90EE90", "Далеко" = "#FFB6C1"),
+                    name = "Группа расстояния\nдо метро") +
+  scale_color_manual(values = c("Близко" = "#4682B4", "Средне" = "#32CD32", "Далеко" = "#FF69B4"),
+                     name = "Группа расстояния\nдо метро") +
+  labs(title = "График плотности: Сравнение распределений (двухфакторный анализ)",
+       x = "Стоимость за м2",
+       y = "Плотность") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+        legend.position = "right",
+        strip.text = element_text(size = 10, face = "bold"))
+
+ggsave("img/density_2factor_anova.png", plot = density_2factor, 
+       width = 12, height = 6, dpi = 300)
+cat("График плотности для двухфакторного ANOVA сохранен: img/density_2factor_anova.png\n")
